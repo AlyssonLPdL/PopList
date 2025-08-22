@@ -48,6 +48,7 @@ function createMainWindow() {
         width: 380,
         height: 500,
         frame: false,
+        alwaysOnTop: true,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -86,9 +87,9 @@ function createChildWindowForRoute(hash, opts = {}) {
     win.on('closed', () => {
         // Quando a janela filha fecha, restaura o tamanho da principal se necessário
         // Apenas se a janela principal não estiver mostrando uma lista
-        if (parent && parent === mainWindow && !mainWindow.getURL().includes('/list/')) {
-            mainWindow.setSize(380, 500, true);
-        }
+        // if (parent && parent === mainWindow && !mainWindow.getURL().includes('/list/')) {
+        //     mainWindow.setSize(380, 500, true);
+        // }
     });
 
     win.loadURL(getBaseUrlForRoute(hash));
@@ -194,10 +195,11 @@ ipcMain.handle('create-list', async (event, listName) => {
 ipcMain.handle('open-create-item-window', async (event, listName) => {
     const encoded = encodeURIComponent(listName);
     createChildWindowForRoute(`/create/${encoded}`, {
-        width: 420,
-        height: 320,
+        width: 500,
+        height: 600,
         parent: mainWindow,
-        frame: false
+        frame: false,
+        resizable: false,
     });
     return { ok: true };
 });
@@ -225,7 +227,30 @@ ipcMain.handle('add-item', async (event, listName, item) => {
         return { ok: false, reason: String(err) };
     }
 });
+ipcMain.handle('update-list', async (event, listName, updatedData) => {
+    try {
+        const safe = sanitizeFileName(listName);
+        const p = path.join(listsDir, `${safe}.json`);
 
+        if (!fs.existsSync(p)) {
+            return { ok: false, reason: 'notfound' };
+        }
+
+        // Manter os dados existentes e apenas atualizar os campos fornecidos
+        const existingData = JSON.parse(fs.readFileSync(p, 'utf8'));
+        const mergedData = { ...existingData, ...updatedData };
+
+        fs.writeFileSync(p, JSON.stringify(mergedData, null, 2), 'utf8');
+
+        // Notificar todas as janelas sobre a atualização
+        BrowserWindow.getAllWindows().forEach(w => w.webContents.send('lists-updated'));
+
+        return { ok: true };
+    } catch (err) {
+        console.error('update-list error', err);
+        return { ok: false, reason: String(err) };
+    }
+});
 /* IPC to open windows from renderer */
 ipcMain.handle('open-list-window', async (event, listName) => {
     const encoded = encodeURIComponent(listName);
@@ -257,7 +282,7 @@ ipcMain.handle('navigate-to', async (event, route) => {
 ipcMain.handle('open-item-detail-window', async (event, listName, itemId) => {
     const encodedListName = encodeURIComponent(listName);
     const encodedItemId = encodeURIComponent(itemId);
-    
+
     // Cria uma janela filha independente
     const win = new BrowserWindow({
         width: 600,
@@ -265,6 +290,7 @@ ipcMain.handle('open-item-detail-window', async (event, listName, itemId) => {
         parent: mainWindow,
         modal: false,
         frame: false,
+        alwaysOnTop: true,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -274,7 +300,7 @@ ipcMain.handle('open-item-detail-window', async (event, listName, itemId) => {
 
     win.loadURL(getBaseUrlForRoute(`/item/${encodedListName}/${encodedItemId}`));
     if (isDev) win.webContents.openDevTools({ mode: 'detach' });
-    
+
     return { ok: true };
 });
 

@@ -77,7 +77,8 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     WebkitAppRegion: "drag",
-    overflow: 'hidden' // Remove scrollbar interno
+    overflow: 'hidden', // Remove scrollbar interno
+    boxShadow: '0 5px 5px rgba(0, 0, 0, 0.3)'
   },
   title: {
     fontSize: '18px',

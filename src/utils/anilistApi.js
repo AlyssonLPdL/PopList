@@ -4,7 +4,7 @@ const ANILIST_API_URL = 'https://graphql.anilist.co';
 /**
  * Busca informações na API do AniList
  * @param {string} searchQuery - Nome do item a ser buscado
- * @param {string} type - Tipo de mídia (anime/manga)
+ * @param {string} type - Tipo de mídia (ANIME/MANGA)
  * @returns {Promise<Object>} Dados da mídia
  */
 export async function searchAniList(searchQuery, type = 'ANIME') {
@@ -29,7 +29,7 @@ export async function searchAniList(searchQuery, type = 'ANIME') {
 
   const variables = {
     search: searchQuery,
-    type: type.toUpperCase()
+    type: type
   };
 
   try {
@@ -75,12 +75,12 @@ export function processAniListData(mediaData) {
 
   // Filtrar e limitar sinônimos
   const synonyms = (mediaData.synonyms || [])
-    .filter(syn => /^[a-zA-Z0-9\s\-]+$/.test(syn)) // Apenas texto ASCII
+    .filter(syn => syn && /^[a-zA-Z0-9\s\-]+$/.test(syn)) // Apenas texto ASCII
     .slice(0, 3);
 
   return {
     name: title,
-    thumb: mediaData.coverImage.large,
+    thumb: mediaData.coverImage?.large || mediaData.coverImage?.medium || null,
     synopsis: synopsis,
     synonyms: synonyms
   };
