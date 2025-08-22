@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 
 export default function ListView() {
   const { name } = useParams();
@@ -8,6 +8,7 @@ export default function ListView() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [isMaximized, setIsMaximized] = useState(false);
+  const navigate = useNavigate();
 
   const load = async () => {
     if (!listName) return;
@@ -15,6 +16,12 @@ export default function ListView() {
       const d = await window.api.getList(listName);
       if (d) setData(d);
       else setData({ name: listName, items: [] });
+    }
+  };
+
+  const handleBack = async () => {
+    if (window.api?.navigateTo) {
+      await window.api.navigateTo("/");
     }
   };
 
@@ -156,6 +163,9 @@ export default function ListView() {
             </div>
           )}
         </div>
+        <button onClick={handleBack} style={styles.backButton}>
+          <span style={styles.backIcon}>←</span>
+        </button>
       </div>
     </div>
   );
@@ -338,7 +348,7 @@ const styles = {
   },
   itemEpisode: {
     fontSize: "14px",
-    color: "#34495e"
+    color: "#34495e",
   },
   tagsContainer: {
     display: "flex",
@@ -362,5 +372,27 @@ const styles = {
     padding: "40px",
     color: "#95a5a6",
     fontSize: "16px",
+  },
+  backButton: {
+    width: "32px",
+    height: "32px",
+    border: "none",
+    backgroundColor: "transparent",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: "8px",
+    WebkitAppRegion: "no-drag",
+    position: "absolute",
+    bottom: "10px",
+  },
+  backIcon: {
+    fontSize: "20px",
+    fontWeight: "bold",
+    color: "#ffffff",
+    backgroundColor: "rgb(129, 202, 255)",
+    padding: "5px 10px",
+    borderRadious: "15px",
   },
 };

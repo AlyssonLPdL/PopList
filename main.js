@@ -65,6 +65,7 @@ function createMainWindow() {
     }
 }
 
+// Modifique a função createChildWindowForRoute:
 function createChildWindowForRoute(hash, opts = {}) {
     const { width = 600, height = 500, parent, frame = true, resizable = true, transparent } = opts;
     const win = new BrowserWindow({
@@ -80,6 +81,14 @@ function createChildWindowForRoute(hash, opts = {}) {
             contextIsolation: true,
             nodeIntegration: false,
         },
+    });
+
+    win.on('closed', () => {
+        // Quando a janela filha fecha, restaura o tamanho da principal se necessário
+        // Apenas se a janela principal não estiver mostrando uma lista
+        if (parent && parent === mainWindow && !mainWindow.getURL().includes('/list/')) {
+            mainWindow.setSize(380, 500, true);
+        }
     });
 
     win.loadURL(getBaseUrlForRoute(hash));
@@ -150,8 +159,8 @@ ipcMain.handle('open-create-list-window', async (event) => {
         minimizable: false,
         maximizable: false,
         alwaysOnTop: true,
-        frame: false, // REMOVE O FRAME PADRÃO DO ELECTRON
-        transparent: true, // PERMITE FUNDO TRANSPARENTE
+        frame: false,
+        transparent: true,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -161,6 +170,7 @@ ipcMain.handle('open-create-list-window', async (event) => {
 
     return { ok: true };
 });
+
 ipcMain.handle('create-list', async (event, listName) => {
     try {
         ensureDirs();
@@ -178,6 +188,17 @@ ipcMain.handle('create-list', async (event, listName) => {
         console.error('create-list error', err);
         return { ok: false, reason: String(err) };
     }
+});
+
+ipcMain.handle('open-create-item-window', async (event, listName) => {
+    const encoded = encodeURIComponent(listName);
+    createChildWindowForRoute(`/create/${encoded}`, {
+        width: 420,
+        height: 320,
+        parent: mainWindow,
+        frame: false
+    });
+    return { ok: true };
 });
 
 ipcMain.handle('add-item', async (event, listName, item) => {
@@ -205,20 +226,32 @@ ipcMain.handle('add-item', async (event, listName, item) => {
 });
 
 /* IPC to open windows from renderer */
-ipcMain.handle('open-create-item-window', async (event, listName) => {
-    createChildWindowForRoute(`/create/${encodeURIComponent(listName)}`, {
-        width: 420,
-        height: 320,
-        parent: mainWindow
-    });
+ipcMain.handle('open-list-window', async (event, listName) => {
+    const encoded = encodeURIComponent(listName);
+
+    // Redimensiona a janela principal
+    mainWindow.setSize(610, 500, true);
+
+    // Carrega a URL
+    mainWindow.loadURL(getBaseUrlForRoute(`/list/${encoded}`));
+
     return { ok: true };
 });
 
-ipcMain.handle('open-list-window', async (event, listName) => {
-    const encoded = encodeURIComponent(listName);
-    createChildWindowForRoute(`/list/${encoded}`, { width: 600, height: 500, parent: mainWindow, frame: false });
+ipcMain.handle('navigate-to', async (event, route) => {
+    // Para voltar à tela principal, redimensiona para o tamanho original
+    if (route === '/') {
+        mainWindow.setSize(380, 500, true);
+    }
+
+    mainWindow.loadURL(getBaseUrlForRoute(route));
     return { ok: true };
 });
+// ipcMain.handle('open-list-window', async (event, listName) => {
+//     const encoded = encodeURIComponent(listName);
+//     createChildWindowForRoute(`/list/${encoded}`, { width: 600, height: 500, parent: mainWindow, frame: false });
+//     return { ok: true };
+// });
 
 ipcMain.handle('open-item-detail-window', async (event, listName, itemId) => {
     const encodedListName = encodeURIComponent(listName);

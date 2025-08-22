@@ -76,6 +76,7 @@ const styles = {
     maxHeight: '240px',
     display: 'flex',
     flexDirection: 'column',
+    WebkitAppRegion: "drag",
     overflow: 'hidden' // Remove scrollbar interno
   },
   title: {
@@ -103,6 +104,7 @@ const styles = {
     boxSizing: 'border-box',
     outline: 'none',
     transition: 'border-color 0.2s ease',
+    WebkitAppRegion: "no-drag",
     ':focus': {
       borderColor: '#3498db',
       boxShadow: '0 0 0 2px rgba(52, 152, 219, 0.2)'
@@ -124,6 +126,7 @@ const styles = {
     fontWeight: '500',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    WebkitAppRegion: "no-drag",
     ':hover': {
       backgroundColor: '#2980b9'
     }
@@ -139,6 +142,7 @@ const styles = {
     fontWeight: '500',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    WebkitAppRegion: "no-drag",
     ':hover': {
       backgroundColor: '#7f8c8d'
     }

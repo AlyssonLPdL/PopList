@@ -29,6 +29,9 @@
             minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
             maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
             closeWindow: () => ipcRenderer.invoke('close-window'),
+            // Adicione esta linha no contextoBridge.exposeInMainWorld:
+            navigateTo: (route) => ipcRenderer.invoke('navigate-to', route),
+            openListWindow: (name) => ipcRenderer.invoke('open-list-window', name),
 
             // subscription for updates (renderer receives 'lists-updated')
             onListsUpdated: (cb) => {
