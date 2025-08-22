@@ -393,6 +393,6 @@ const styles = {
     color: "#ffffff",
     backgroundColor: "rgb(129, 202, 255)",
     padding: "5px 10px",
-    borderRadious: "15px",
+    borderRadius: 15,
   },
 };

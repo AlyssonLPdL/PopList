@@ -120,9 +120,10 @@ ipcMain.handle('maximize-window', (event) => {
     }
 });
 
+// Substitua o handler close-window por este:
 ipcMain.handle('close-window', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (win) {
+    if (win && !win.isDestroyed()) {
         win.close();
     }
 });
@@ -256,12 +257,24 @@ ipcMain.handle('navigate-to', async (event, route) => {
 ipcMain.handle('open-item-detail-window', async (event, listName, itemId) => {
     const encodedListName = encodeURIComponent(listName);
     const encodedItemId = encodeURIComponent(itemId);
-    createChildWindowForRoute(`/item/${encodedListName}/${encodedItemId}`, {
+    
+    // Cria uma janela filha independente
+    const win = new BrowserWindow({
         width: 600,
         height: 500,
         parent: mainWindow,
-        frame: false
+        modal: false,
+        frame: false,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        },
     });
+
+    win.loadURL(getBaseUrlForRoute(`/item/${encodedListName}/${encodedItemId}`));
+    if (isDev) win.webContents.openDevTools({ mode: 'detach' });
+    
     return { ok: true };
 });
 
