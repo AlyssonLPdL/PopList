@@ -4,14 +4,22 @@ export const AVAILABLE_APIS = {
     id: 'anilist',
     name: 'AniList',
     types: ['anime', 'manga'],
-    enabled: true
+    enabled: true,
+    typeMapping: {
+      'anime': 'ANIME',
+      'manga': 'MANGA'
+    }
   }
-  // Podemos adicionar mais APIs no futuro:
+  // Exemplo de como adicionar outra API:
   // TMDB: {
   //   id: 'tmdb',
   //   name: 'The Movie DB',
   //   types: ['movie', 'tv'],
-  //   enabled: false
+  //   enabled: false,
+  //   typeMapping: {
+  //     'movie': 'movie',
+  //     'tv': 'tv'
+  //   }
   // }
 };
 
@@ -20,5 +28,6 @@ export const ALL_TYPES = Object.values(AVAILABLE_APIS)
   .flatMap(api => api.types.map(type => ({
     value: type,
     api: api.id,
-    label: type.charAt(0).toUpperCase() + type.slice(1)
+    label: type.charAt(0).toUpperCase() + type.slice(1),
+    apiType: api.typeMapping[type] || type
   })));

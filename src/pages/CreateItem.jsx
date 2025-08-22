@@ -7,7 +7,7 @@ export default function CreateItem() {
   const { listName } = useParams();
   const decodedListName = decodeURIComponent(listName || "");
   const [name, setName] = useState("");
-  const [type, setType] = useState("anime");
+  const [type, setType] = useState("");
   const [episode, setEpisode] = useState(0);
   const [episodeEnabled, setEpisodeEnabled] = useState(true);
   const [tags, setTags] = useState("");
@@ -25,13 +25,35 @@ export default function CreateItem() {
     const loadListData = async () => {
       if (window.api?.getList) {
         const data = await window.api.getList(decodedListName);
-        setListData(
-          data || {
-            name: decodedListName,
-            customTags: [],
-            enabledTypes: ALL_TYPES.map((t) => t.value),
+        if (data) {
+          setListData(data);
+          // Carregar tags personalizadas para o datalist
+          setUserTags(Array.isArray(data.customTags) ? data.customTags : []);
+
+          // Definir o tipo inicial baseado nos tipos habilitados
+          const enabledTypes = Array.isArray(data.enabledTypes)
+            ? data.enabledTypes
+            : ALL_TYPES.map((t) => t.value);
+
+          // Se houver tipos habilitados, usar o primeiro como padrão
+          if (enabledTypes.length > 0 && !type) {
+            setType(enabledTypes[0]);
           }
-        );
+        } else {
+          // Se a lista não existe, criar estrutura padrão
+          const defaultData = {
+            name: decodedListName,
+            items: [],
+            enabledTypes: ALL_TYPES.map((t) => t.value),
+            customTags: [],
+          };
+          setListData(defaultData);
+
+          // Definir o primeiro tipo disponível como padrão
+          if (ALL_TYPES.length > 0 && !type) {
+            setType(ALL_TYPES[0].value);
+          }
+        }
       }
     };
     loadListData();
@@ -40,11 +62,15 @@ export default function CreateItem() {
   // Busca automática quando o nome ou tipo mudar
   useEffect(() => {
     const fetchData = async () => {
-      if (name.length > 3) {
+      if (name.length > 3 && type) {
+        // Garantir que type não está vazio
         setIsSearching(true);
         const data = await autoSearchItem(name, type);
         setAutoFillData(data);
         setIsSearching(false);
+      } else if (autoFillData) {
+        // Se o nome ficou muito curto ou tipo mudou, limpar dados anteriores
+        setAutoFillData(null);
       }
     };
 
@@ -153,21 +179,23 @@ export default function CreateItem() {
               style={styles.input}
             />
 
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              style={styles.select}
-            >
-              {ALL_TYPES.filter((t) =>
-                (
-                  listData?.enabledTypes || ALL_TYPES.map((t) => t.value)
-                ).includes(t.value)
-              ).map((typeOption) => (
-                <option key={typeOption.value} value={typeOption.value}>
-                  {typeOption.label}
-                </option>
-              ))}
-            </select>
+            {type && (
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                style={styles.select}
+              >
+                {ALL_TYPES.filter((t) =>
+                  (
+                    listData?.enabledTypes || ALL_TYPES.map((t) => t.value)
+                  ).includes(t.value)
+                ).map((typeOption) => (
+                  <option key={typeOption.value} value={typeOption.value}>
+                    {typeOption.label}
+                  </option>
+                ))}
+              </select>
+            )}
 
             <div style={styles.episodeContainer}>
               <input

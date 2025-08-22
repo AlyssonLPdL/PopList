@@ -30,10 +30,13 @@ export async function autoSearchItem(itemName, itemType) {
     let mediaData = null;
     switch (typeConfig.api) {
       case 'anilist':
-        // A AniList espera o tipo em maiúsculas (ANIME/MANGA)
-        mediaData = await searchAniList(itemName, itemType.toUpperCase());
+        // Usar o tipo mapeado para a API
+        mediaData = await searchAniList(itemName, typeConfig.apiType);
         break;
       // Adicionar casos para outras APIs no futuro
+      // case 'tmdb':
+      //   mediaData = await searchTMDB(itemName, typeConfig.apiType);
+      //   break;
       default:
         console.error(`API ${typeConfig.api} não implementada.`);
         return null;
@@ -46,6 +49,8 @@ export async function autoSearchItem(itemName, itemType) {
       case 'anilist':
         return processAniListData(mediaData);
       // Adicionar processamento para outras APIs no futuro
+      // case 'tmdb':
+      //   return processTMDBData(mediaData);
       default:
         return null;
     }

@@ -23,6 +23,7 @@ export async function searchAniList(searchQuery, type = 'ANIME') {
         }
         description
         synonyms
+        type
       }
     }
   `;
@@ -50,7 +51,14 @@ export async function searchAniList(searchQuery, type = 'ANIME') {
     }
 
     const data = await response.json();
-    return data.data.Media;
+
+    // Verificar se o tipo retornado corresponde ao tipo solicitado
+    if (data.data.Media && data.data.Media.type === type) {
+      return data.data.Media;
+    }
+
+    // Se não corresponde, retornar null para forçar uma nova busca
+    return null;
   } catch (error) {
     console.error('Erro na busca do AniList:', error);
     return null;
@@ -69,8 +77,8 @@ export function processAniListData(mediaData) {
   const title = mediaData.title.english || mediaData.title.romaji || mediaData.title.native;
 
   // Processar sinopse (remover tags HTML)
-  const synopsis = mediaData.description 
-    ? mediaData.description.replace(/<[^>]*>/g, '') 
+  const synopsis = mediaData.description
+    ? mediaData.description.replace(/<[^>]*>/g, '')
     : '';
 
   // Filtrar e limitar sinônimos

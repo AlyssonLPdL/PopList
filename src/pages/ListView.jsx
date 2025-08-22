@@ -10,7 +10,6 @@ export default function ListView() {
   const [filterType, setFilterType] = useState("all");
   const [isMaximized, setIsMaximized] = useState(false);
   const navigate = useNavigate();
-  const [showSettings, setShowSettings] = useState(false);
   const [enabledTypes, setEnabledTypes] = useState([]);
   const [newTag, setNewTag] = useState("");
 
@@ -55,30 +54,9 @@ export default function ListView() {
       setEnabledTypes(data.enabledTypes);
     } else {
       // Padrão: habilitar todos os tipos disponíveis
-      setEnabledTypes(ALL_TYPES.map(t => t.value));
+      setEnabledTypes(ALL_TYPES.map((t) => t.value));
     }
   }, [data]);
-
-  const toggleType = (typeValue) => {
-    if (enabledTypes.includes(typeValue)) {
-      setEnabledTypes(enabledTypes.filter((t) => t !== typeValue));
-    } else {
-      setEnabledTypes([...enabledTypes, typeValue]);
-    }
-  };
-
-  const saveEnabledTypes = async () => {
-    if (window.api?.updateList && data) { // Adicionar verificação para data
-      const result = await window.api.updateList(data.name, {
-        ...data,
-        enabledTypes: enabledTypes,
-      });
-
-      if (result.ok) {
-        setData({ ...data, enabledTypes: enabledTypes });
-      }
-    }
-  };
 
   const addItem = async () => {
     if (window.api?.openCreateItemWindow) {
@@ -107,40 +85,6 @@ export default function ListView() {
     if (window.api?.closeWindow) window.api.closeWindow();
   };
 
-  const addCustomType = async () => {
-    if (!newType.trim()) return;
-
-    if (window.api?.updateList) {
-      const updatedTypes = [...(data.customTypes || []), newType.trim()];
-      const result = await window.api.updateList(data.name, {
-        ...data,
-        customTypes: updatedTypes,
-      });
-
-      if (result.ok) {
-        setData({ ...data, customTypes: updatedTypes });
-        setNewType("");
-      }
-    }
-  };
-
-  const addCustomTag = async () => {
-    if (!newTag.trim()) return;
-
-    if (window.api?.updateList) {
-      const updatedTags = [...(data.customTags || []), newTag.trim()];
-      const result = await window.api.updateList(data.name, {
-        ...data,
-        customTags: updatedTags,
-      });
-
-      if (result.ok) {
-        setData({ ...data, customTags: updatedTags });
-        setNewTag("");
-      }
-    }
-  };
-
   if (!data) {
     return (
       <div style={styles.container}>
@@ -153,6 +97,12 @@ export default function ListView() {
       </div>
     );
   }
+
+  const openSettingsWindow = async () => {
+    if (window.api?.openSettingsWindow) {
+      await window.api.openSettingsWindow(listName);
+    }
+  };
 
   // Filtrar itens com base no termo de busca e tipo
   const filteredItems = data.items.filter((item) => {
@@ -172,82 +122,10 @@ export default function ListView() {
       <div style={styles.titleBar}>
         <div style={styles.titleBarText}>{data.name}</div>
         <div style={styles.windowControls}>
-          <button
-            style={styles.controlButton}
-            onClick={() => setShowSettings(true)}
-          >
+          <button style={styles.controlButton} onClick={openSettingsWindow}>
             <span style={styles.controlIcon}>⚙️</span>
           </button>
-          {/* Modal de configurações */}
-          {showSettings && (
-            <div style={styles.modalOverlay}>
-              <div style={styles.modal}>
-                <h2 style={styles.modalTitle}>
-                  Configurações da Lista - {data.name}
-                </h2>
 
-                <div style={styles.settingsSection}>
-                  <h3>Tipos Habilitados</h3>
-                  <p>Selecione os tipos de mídia que esta lista pode conter:</p>
-                  <div style={styles.typesContainer}>
-                    {ALL_TYPES.map((type) => (
-                      <label key={type.value} style={styles.typeLabel}>
-                        <input
-                          type="checkbox"
-                          checked={enabledTypes.includes(type.value)}
-                          onChange={() => toggleType(type.value)}
-                          style={styles.typeCheckbox}
-                        />
-                        {type.label} (via{" "}
-                        {AVAILABLE_APIS[type.api.toUpperCase()]?.name ||
-                          type.api}
-                        )
-                      </label>
-                    ))}
-                  </div>
-                  <button
-                    onClick={saveEnabledTypes}
-                    style={styles.settingsButton}
-                  >
-                    Salvar Tipos
-                  </button>
-                </div>
-
-                <div style={styles.settingsSection}>
-                  <h3>Tags Personalizadas</h3>
-                  <div style={styles.inputRow}>
-                    <input
-                      type="text"
-                      value={newTag}
-                      onChange={(e) => setNewTag(e.target.value)}
-                      placeholder="Nova tag"
-                      style={styles.settingsInput}
-                    />
-                    <button
-                      onClick={addCustomTag}
-                      style={styles.settingsButton}
-                    >
-                      Adicionar
-                    </button>
-                  </div>
-                  <div style={styles.tagsContainer}>
-                    {(data.customTags || []).map((tag, index) => (
-                      <span key={index} style={styles.tag}>
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setShowSettings(false)}
-                  style={styles.closeSettingsButton}
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          )}
           <button style={styles.controlButton} onClick={handleMinimize}>
             <span style={styles.controlIcon}>−</span>
           </button>
@@ -516,23 +394,6 @@ const styles = {
     fontSize: "14px",
     color: "#34495e",
   },
-  tagsContainer: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "4px",
-  },
-  tag: {
-    fontSize: "11px",
-    color: "#3498db",
-    backgroundColor: "#e1f0fa",
-    padding: "2px 6px",
-    borderRadius: "8px",
-  },
-  moreTags: {
-    fontSize: "11px",
-    color: "#95a5a6",
-    padding: "2px 6px",
-  },
   emptyState: {
     textAlign: "center",
     padding: "40px",
@@ -560,72 +421,5 @@ const styles = {
     backgroundColor: "rgb(129, 202, 255)",
     padding: "5px 10px",
     borderRadius: 15,
-  },
-  modalOverlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000,
-  },
-  modal: {
-    backgroundColor: "white",
-    padding: "20px",
-    borderRadius: "8px",
-    width: "400px",
-    maxHeight: "80vh",
-    overflow: "auto",
-  },
-  modalTitle: {
-    marginTop: 0,
-    marginBottom: "20px",
-  },
-  settingsSection: {
-    marginBottom: "20px",
-  },
-  inputRow: {
-    display: "flex",
-    gap: "10px",
-    marginBottom: "10px",
-  },
-  settingsInput: {
-    flex: 1,
-    padding: "8px",
-    border: "1px solid #ddd",
-    borderRadius: "4px",
-  },
-  settingsButton: {
-    padding: "8px 12px",
-    backgroundColor: "#3498db",
-    color: "white",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-  },
-  tagsContainer: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-  },
-  tag: {
-    backgroundColor: "#e1f0fa",
-    color: "#3498db",
-    padding: "4px 8px",
-    borderRadius: "12px",
-    fontSize: "12px",
-  },
-  closeSettingsButton: {
-    padding: "10px 16px",
-    backgroundColor: "#95a5a6",
-    color: "white",
-    border: "none",
-    borderRadius: "4px",
-    cursor: "pointer",
-    marginTop: "10px",
   },
 };
