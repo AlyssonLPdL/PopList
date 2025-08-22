@@ -1,4 +1,6 @@
 // anilistApi.js
+import { translateText, isTranslationEnabled, getTargetLanguage } from './translationService';
+
 const ANILIST_API_URL = 'https://graphql.anilist.co';
 
 /**
@@ -70,7 +72,7 @@ export async function searchAniList(searchQuery, type = 'ANIME') {
  * @param {Object} mediaData - Dados retornados pela API
  * @returns {Object} Dados processados
  */
-export function processAniListData(mediaData) {
+export async function processAniListData(mediaData) {
   if (!mediaData) return null;
 
   // Escolher o título preferido (prioridade: inglês → romaji → nativo)
@@ -81,15 +83,44 @@ export function processAniListData(mediaData) {
     ? mediaData.description.replace(/<[^>]*>/g, '')
     : '';
 
+  // Traduzir sinopse se configurado
+  let translatedSynopsis = synopsis;
+  if (synopsis && isTranslationEnabled()) {
+    translatedSynopsis = await translateText(synopsis, getTargetLanguage());
+  }
+
+  // Coletar todos os sinônimos possíveis
+  const allSynonyms = [];
+  
+  // Adicionar títulos alternativos
+  if (mediaData.title.romaji && mediaData.title.romaji !== title) {
+    allSynonyms.push(mediaData.title.romaji);
+  }
+  if (mediaData.title.english && mediaData.title.english !== title) {
+    allSynonyms.push(mediaData.title.english);
+  }
+  if (mediaData.title.native && mediaData.title.native !== title) {
+    allSynonyms.push(mediaData.title.native);
+  }
+  
+  // Adicionar sinônimos da API
+  if (mediaData.synonyms && Array.isArray(mediaData.synonyms)) {
+    mediaData.synonyms.forEach(synonym => {
+      if (synonym && synonym !== title && !allSynonyms.includes(synonym)) {
+        allSynonyms.push(synonym);
+      }
+    });
+  }
+
   // Filtrar e limitar sinônimos
-  const synonyms = (mediaData.synonyms || [])
-    .filter(syn => syn && /^[a-zA-Z0-9\s\-]+$/.test(syn)) // Apenas texto ASCII
-    .slice(0, 3);
+  const synonyms = allSynonyms
+    .filter(syn => syn && syn.trim().length > 0)
+    .slice(0, 5);
 
   return {
     name: title,
     thumb: mediaData.coverImage?.large || mediaData.coverImage?.medium || null,
-    synopsis: synopsis,
+    synopsis: translatedSynopsis,
     synonyms: synonyms
   };
 }
