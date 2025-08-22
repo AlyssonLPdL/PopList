@@ -13,6 +13,7 @@ export default function ListSettings() {
   const [availableLists, setAvailableLists] = useState([]);
   const [selectedListForImport, setSelectedListForImport] = useState("");
   const [activeTab, setActiveTab] = useState("general");
+  const [feedback, setFeedback] = useState({ message: "", type: "" });
   const [availableListsData, setAvailableListsData] = useState([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -107,11 +108,25 @@ export default function ListSettings() {
     }
   };
 
+  const tagExists = (tag, tagList) => {
+    return tagList.some(
+      (existingTag) => existingTag.toLowerCase() === tag.toLowerCase()
+    );
+  };
+
   const addCustomTag = async () => {
     if (!newTag.trim()) return;
 
     try {
       const currentTags = Array.isArray(data.customTags) ? data.customTags : [];
+
+      // Verificar se a tag já existe
+      if (tagExists(newTag.trim(), currentTags)) {
+        setFeedback({ message: "Esta tag já existe!", type: "error" });
+        setTimeout(() => setFeedback({ message: "", type: "" }), 3000);
+        return;
+      }
+
       const updatedTags = [...currentTags, newTag.trim()];
 
       setData({
@@ -120,8 +135,12 @@ export default function ListSettings() {
       });
 
       setNewTag("");
+      setFeedback({ message: "Tag adicionada com sucesso!", type: "success" });
+      setTimeout(() => setFeedback({ message: "", type: "" }), 3000);
     } catch (error) {
       console.error("Erro ao adicionar tag:", error);
+      setFeedback({ message: "Erro ao adicionar tag", type: "error" });
+      setTimeout(() => setFeedback({ message: "", type: "" }), 3000);
     }
   };
 
@@ -144,7 +163,16 @@ export default function ListSettings() {
       .filter((tag) => tag.length > 0);
 
     const currentTags = Array.isArray(data.customTags) ? data.customTags : [];
-    const updatedTags = [...new Set([...currentTags, ...tags])]; // Remove duplicates
+
+    // Filtrar apenas tags que não existem
+    const newTags = tags.filter((tag) => !tagExists(tag, currentTags));
+
+    if (newTags.length === 0) {
+      alert("Todas as tags fornecidas já existem na lista.");
+      return;
+    }
+
+    const updatedTags = [...currentTags, ...newTags];
 
     setData({
       ...data,
@@ -152,6 +180,12 @@ export default function ListSettings() {
     });
 
     setImportTagsText("");
+
+    if (newTags.length < tags.length) {
+      alert(
+        `${tags.length - newTags.length} tag(s) duplicada(s) foram ignoradas.`
+      );
+    }
   };
 
   const importTagsFromList = async () => {
@@ -165,14 +199,31 @@ export default function ListSettings() {
         const currentTags = Array.isArray(data.customTags)
           ? data.customTags
           : [];
-        const updatedTags = [
-          ...new Set([...currentTags, ...otherList.customTags]),
-        ];
+
+        // Filtrar apenas tags que não existem
+        const newTags = otherList.customTags.filter(
+          (tag) => !tagExists(tag, currentTags)
+        );
+
+        if (newTags.length === 0) {
+          alert("Todas as tags da lista selecionada já existem nesta lista.");
+          return;
+        }
+
+        const updatedTags = [...currentTags, ...newTags];
 
         setData({
           ...data,
           customTags: updatedTags,
         });
+
+        if (newTags.length < otherList.customTags.length) {
+          alert(
+            `${
+              otherList.customTags.length - newTags.length
+            } tag(s) duplicada(s) foram ignoradas.`
+          );
+        }
       }
     } catch (error) {
       console.error("Erro ao importar tags de outra lista:", error);
@@ -207,6 +258,17 @@ export default function ListSettings() {
           </button>
         </div>
       </div>
+
+      {feedback.message && (
+        <div
+          style={{
+            ...styles.feedback,
+            backgroundColor: feedback.type === "error" ? "#e74c3c" : "#27ae60",
+          }}
+        >
+          {feedback.message}
+        </div>
+      )}
 
       <div style={styles.tabContainer}>
         <button
@@ -527,6 +589,13 @@ const styles = {
   settingsSection: {
     marginBottom: "30px",
     flex: 1,
+  },
+  feedback: {
+    padding: "10px",
+    color: "white",
+    textAlign: "center",
+    fontSize: "14px",
+    fontWeight: "500",
   },
   sectionTitle: {
     fontSize: "18px",

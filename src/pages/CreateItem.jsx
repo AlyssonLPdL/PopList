@@ -10,15 +10,14 @@ export default function CreateItem() {
   const [type, setType] = useState("");
   const [episode, setEpisode] = useState(0);
   const [episodeEnabled, setEpisodeEnabled] = useState(true);
-  const [tags, setTags] = useState("");
   const [rating, setRating] = useState(0);
   const [error, setError] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [autoFillData, setAutoFillData] = useState(null);
-  const [userTypes, setUserTypes] = useState([]);
   const [userTags, setUserTags] = useState([]);
-  const [enabledTypes, setEnabledTypes] = useState([]);
   const [listData, setListData] = useState(null);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [filterTagText, setFilterTagText] = useState("");
 
   // Carrega tipos e tags personalizados da lista
   useEffect(() => {
@@ -78,6 +77,18 @@ export default function CreateItem() {
     return () => clearTimeout(delayDebounce);
   }, [name, type]);
 
+  // Função para adicionar tag
+  const addTag = (tag) => {
+    if (!selectedTags.includes(tag)) {
+      setSelectedTags([...selectedTags, tag]);
+    }
+  };
+
+  // Função para remover tag
+  const removeTag = (tagToRemove) => {
+    setSelectedTags(selectedTags.filter((tag) => tag !== tagToRemove));
+  };
+
   const handleAdd = async () => {
     if (!name.trim()) {
       setError("Digite um nome para o item");
@@ -89,10 +100,7 @@ export default function CreateItem() {
         name,
         type,
         episode: episodeEnabled ? parseInt(episode) || 0 : 0,
-        tags: tags
-          .split(",")
-          .map((t) => t.trim())
-          .filter(Boolean),
+        tags: selectedTags,
         rating,
         synonyms: autoFillData?.synonyms || [],
         thumb: autoFillData?.thumb || null,
@@ -115,9 +123,14 @@ export default function CreateItem() {
     }
   };
 
+  // Filtrar tags baseado no texto de filtro
+  const filteredTags = userTags.filter((tag) =>
+    tag.toLowerCase().includes(filterTagText.toLowerCase())
+  );
+
   // Renderizar estrelas para a avaliação
   const renderStars = () => {
-    return [1, 2, 3, 4, 5].map((star) => (
+    return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
       <label key={star} style={styles.starLabel}>
         <input
           type="checkbox"
@@ -170,86 +183,130 @@ export default function CreateItem() {
             </div>
           )}
 
-          <div style={styles.form}>
-            <input
-              type="text"
-              placeholder="Nome do item"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              style={styles.input}
-            />
+          <div style={styles.columnsContainer}>
+            {/* Coluna do formulário */}
+            <div style={styles.formColumn}>
+              <div style={styles.form}>
+                <input
+                  type="text"
+                  placeholder="Nome do item"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  style={styles.input}
+                />
 
-            {type && (
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value)}
-                style={styles.select}
-              >
-                {ALL_TYPES.filter((t) =>
-                  (
-                    listData?.enabledTypes || ALL_TYPES.map((t) => t.value)
-                  ).includes(t.value)
-                ).map((typeOption) => (
-                  <option key={typeOption.value} value={typeOption.value}>
-                    {typeOption.label}
-                  </option>
-                ))}
-              </select>
-            )}
+                {type && (
+                  <select
+                    value={type}
+                    onChange={(e) => setType(e.target.value)}
+                    style={styles.select}
+                  >
+                    {ALL_TYPES.filter((t) =>
+                      (
+                        listData?.enabledTypes || ALL_TYPES.map((t) => t.value)
+                      ).includes(t.value)
+                    ).map((typeOption) => (
+                      <option key={typeOption.value} value={typeOption.value}>
+                        {typeOption.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
 
-            <div style={styles.episodeContainer}>
-              <input
-                type="number"
-                placeholder="Episódio/Capítulo"
-                value={episode}
-                onChange={(e) => setEpisode(e.target.value)}
-                style={{
-                  ...styles.input,
-                  ...(!episodeEnabled && styles.disabledInput),
-                }}
-                disabled={!episodeEnabled}
-              />
-              <button
-                onClick={() => setEpisodeEnabled(!episodeEnabled)}
-                style={
-                  episodeEnabled
-                    ? styles.toggleButtonOn
-                    : styles.toggleButtonOff
-                }
-              >
-                {episodeEnabled ? "On" : "Off"}
-              </button>
+                <div style={styles.episodeContainer}>
+                  <input
+                    type="number"
+                    placeholder="Episódio/Capítulo"
+                    value={episode}
+                    onChange={(e) => setEpisode(e.target.value)}
+                    style={{
+                      ...styles.input,
+                      ...(!episodeEnabled && styles.disabledInput),
+                    }}
+                    disabled={!episodeEnabled}
+                  />
+                  <button
+                    onClick={() => setEpisodeEnabled(!episodeEnabled)}
+                    style={
+                      episodeEnabled
+                        ? styles.toggleButtonOn
+                        : styles.toggleButtonOff
+                    }
+                  >
+                    {episodeEnabled ? "On" : "Off"}
+                  </button>
+                </div>
+
+                <div style={styles.ratingContainer}>
+                  <label style={styles.ratingLabel}>Avaliação:</label>
+                  <div style={styles.starsContainer}>{renderStars()}</div>
+                </div>
+
+                {/* Tags selecionadas */}
+                <div style={styles.selectedTagsContainer}>
+                  <label style={styles.tagsLabel}>Tags selecionadas:</label>
+                  <div style={styles.selectedTags}>
+                    {selectedTags.map((tag) => (
+                      <span
+                        key={tag}
+                        style={styles.tagChip}
+                        onClick={() => removeTag(tag)}
+                      >
+                        {tag} ×
+                      </span>
+                    ))}
+                    {selectedTags.length === 0 && (
+                      <span style={styles.noTagsText}>
+                        Nenhuma tag selecionada
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={styles.buttonContainer}>
+                  <button onClick={handleAdd} style={styles.addButton}>
+                    Adicionar Item
+                  </button>
+                  <button
+                    onClick={() => window.close()}
+                    style={styles.cancelButton}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
             </div>
 
-            <input
-              type="text"
-              placeholder="Tags (separadas por vírgula)"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              style={styles.input}
-              list="userTagsList"
-            />
-            <datalist id="userTagsList">
-              {userTags.map((tag, index) => (
-                <option key={index} value={tag} />
-              ))}
-            </datalist>
-
-            <div style={styles.ratingContainer}>
-              <label style={styles.ratingLabel}>Avaliação:</label>
-              <div style={styles.starsContainer}>{renderStars()}</div>
-            </div>
-
-            <div style={styles.buttonContainer}>
-              <button onClick={handleAdd} style={styles.addButton}>
-                Adicionar Item
-              </button>
-              <button
-                onClick={() => window.close()}
-                style={styles.cancelButton}
-              >
-                Cancelar
-              </button>
+            {/* Coluna das tags */}
+            <div style={styles.tagsColumn}>
+              <div style={styles.tagsSection}>
+                <h3 style={styles.tagsTitle}>Tags Disponíveis</h3>
+                <input
+                  type="text"
+                  placeholder="Filtrar tags..."
+                  value={filterTagText}
+                  onChange={(e) => setFilterTagText(e.target.value)}
+                  style={styles.filterInput}
+                />
+                <div style={styles.tagsList}>
+                  {filteredTags.map((tag) => (
+                    <div
+                      key={tag}
+                      style={styles.tagItem}
+                      onClick={() => addTag(tag)}
+                    >
+                      {tag}
+                    </div>
+                  ))}
+                  {filteredTags.length === 0 && (
+                    <div style={styles.noTags}>
+                      {filterTagText
+                        ? "Nenhuma tag encontrada"
+                        : "Nenhuma tag disponível"}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -269,7 +326,7 @@ const styles = {
       '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
   window: {
-    width: "500px",
+    width: "650px",
     height: "600px",
     backgroundColor: "white",
     display: "flex",
@@ -356,6 +413,19 @@ const styles = {
     height: "100%",
     objectFit: "cover",
   },
+  columnsContainer: {
+    display: "flex",
+    gap: "20px",
+    height: "70%",
+  },
+  formColumn: {
+    flex: 1,
+  },
+  tagsColumn: {
+    flex: 1,
+    borderLeft: "1px solid #e0e0e0",
+    paddingLeft: "20px",
+  },
   form: {
     display: "flex",
     flexDirection: "column",
@@ -373,41 +443,6 @@ const styles = {
     borderRadius: "6px",
     fontSize: "14px",
     backgroundColor: "white",
-  },
-  textarea: {
-    padding: "10px",
-    border: "1px solid #ddd",
-    borderRadius: "6px",
-    fontSize: "14px",
-    minHeight: "80px",
-    resize: "vertical",
-  },
-  buttonContainer: {
-    display: "flex",
-    gap: "10px",
-    marginTop: "10px",
-  },
-  addButton: {
-    flex: 1,
-    padding: "12px",
-    backgroundColor: "#3498db",
-    color: "white",
-    border: "none",
-    borderRadius: "6px",
-    fontSize: "14px",
-    fontWeight: "500",
-    cursor: "pointer",
-  },
-  cancelButton: {
-    flex: 1,
-    padding: "12px",
-    backgroundColor: "#95a5a6",
-    color: "white",
-    border: "none",
-    borderRadius: "6px",
-    fontSize: "14px",
-    fontWeight: "500",
-    cursor: "pointer",
   },
   episodeContainer: {
     display: "flex",
@@ -455,5 +490,105 @@ const styles = {
   starIcon: {
     fontSize: "24px",
     color: "#f39c12",
+  },
+  selectedTagsContainer: {
+    marginTop: "10px",
+  },
+  tagsLabel: {
+    fontSize: "14px",
+    fontWeight: "500",
+    marginBottom: "5px",
+    display: "block",
+  },
+  selectedTags: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "5px",
+    minHeight: "40px",
+    alignItems: "center",
+  },
+  tagChip: {
+    backgroundColor: "#e1f0fa",
+    color: "#3498db",
+    padding: "5px 10px",
+    borderRadius: "16px",
+    fontSize: "12px",
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    transition: "all 0.2s ease",
+  },
+  noTagsText: {
+    color: "#95a5a6",
+    fontStyle: "italic",
+  },
+  buttonContainer: {
+    display: "flex",
+    gap: "10px",
+    marginTop: "10px",
+  },
+  addButton: {
+    flex: 1,
+    padding: "12px",
+    backgroundColor: "#3498db",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    fontSize: "14px",
+    fontWeight: "500",
+    cursor: "pointer",
+  },
+  cancelButton: {
+    flex: 1,
+    padding: "12px",
+    backgroundColor: "#95a5a6",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    fontSize: "14px",
+    fontWeight: "500",
+    cursor: "pointer",
+  },
+  tagsSection: {
+    height: "100%",
+    display: "flex",
+    flexDirection: "column",
+  },
+  tagsTitle: {
+    fontSize: "16px",
+    fontWeight: "600",
+    margin: "0 0 15px 0",
+    color: "#2c3e50",
+  },
+  filterInput: {
+    padding: "8px 12px",
+    border: "1px solid #ddd",
+    borderRadius: "6px",
+    fontSize: "14px",
+    marginBottom: "15px",
+  },
+  tagsList: {
+    flex: 1,
+    overflow: "auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  tagItem: {
+    padding: "8px 12px",
+    backgroundColor: "#f5f5f7",
+    borderRadius: "6px",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+    ":hover": {
+      backgroundColor: "#e0e0e0",
+    },
+  },
+  noTags: {
+    color: "#95a5a6",
+    fontStyle: "italic",
+    textAlign: "center",
+    padding: "20px",
   },
 };
