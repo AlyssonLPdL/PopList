@@ -7,6 +7,7 @@ import ListView from './pages/ListView';
 import CreateItem from './pages/CreateItem';
 import ItemDetail from './pages/ItemDetail';
 
+
 const container = document.getElementById('root');
 const root = createRoot(container);
 root.render(
@@ -17,6 +18,7 @@ root.render(
             <Route path="/list/:name" element={<ListView />} />
             <Route path="/create/:listName" element={<CreateItem />} />
             <Route path="/item/:listName/:itemId" element={<ItemDetail />} />
+            <Route path="/create-list" element={<CreateList />} />
         </Routes>
     </HashRouter>
 );

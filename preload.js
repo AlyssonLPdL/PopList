@@ -21,10 +21,14 @@
             createList: (name) => ipcRenderer.invoke('create-list', name),
             addItem: (listName, item) => ipcRenderer.invoke('add-item', listName, item),
             openItemDetailWindow: (listName, itemId) => ipcRenderer.invoke('open-item-detail-window', listName, itemId),
+            openCreateListWindow: () => ipcRenderer.invoke('open-create-list-window'),
 
             // window control
-            openCreateWindow: (listName) => ipcRenderer.invoke('open-create-window', listName),
+            openCreateItemWindow: (listName) => ipcRenderer.invoke('open-create-item-window', listName),
             openListWindow: (name) => ipcRenderer.invoke('open-list-window', name),
+            minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
+            maximizeWindow: () => ipcRenderer.invoke('maximize-window'),
+            closeWindow: () => ipcRenderer.invoke('close-window'),
 
             // subscription for updates (renderer receives 'lists-updated')
             onListsUpdated: (cb) => {

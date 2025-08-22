@@ -45,8 +45,9 @@ let mainWindow;
 
 function createMainWindow() {
     mainWindow = new BrowserWindow({
-        width: 1100,
-        height: 720,
+        width: 380,
+        height: 500,
+        frame: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -65,12 +66,15 @@ function createMainWindow() {
 }
 
 function createChildWindowForRoute(hash, opts = {}) {
-    const { width = 600, height = 500, parent } = opts;
+    const { width = 600, height = 500, parent, frame = true, resizable = true, transparent } = opts;
     const win = new BrowserWindow({
         width,
         height,
         parent: parent || null,
         modal: false,
+        frame,
+        resizable,
+        transparent,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -89,6 +93,30 @@ app.whenReady().then(() => {
     createMainWindow();
 });
 
+ipcMain.handle('minimize-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+        win.minimize();
+    }
+});
+
+ipcMain.handle('maximize-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+        if (win.isMaximized()) {
+            win.unmaximize();
+        } else {
+            win.maximize();
+        }
+    }
+});
+
+ipcMain.handle('close-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+        win.close();
+    }
+});
 /* IPC handlers for FS operations */
 ipcMain.handle('get-lists', async () => {
     try {
@@ -113,7 +141,26 @@ ipcMain.handle('get-list', async (event, listName) => {
         return null;
     }
 });
+ipcMain.handle('open-create-list-window', async (event) => {
+    const win = createChildWindowForRoute(`/create-list`, {
+        width: 400,
+        height: 200,
+        parent: mainWindow,
+        resizable: false,
+        minimizable: false,
+        maximizable: false,
+        alwaysOnTop: true,
+        frame: false, // REMOVE O FRAME PADRÃO DO ELECTRON
+        transparent: true, // PERMITE FUNDO TRANSPARENTE
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.js'),
+            contextIsolation: true,
+            nodeIntegration: false,
+        }
+    });
 
+    return { ok: true };
+});
 ipcMain.handle('create-list', async (event, listName) => {
     try {
         ensureDirs();
@@ -158,7 +205,7 @@ ipcMain.handle('add-item', async (event, listName, item) => {
 });
 
 /* IPC to open windows from renderer */
-ipcMain.handle('open-create-window', async (event, listName) => {
+ipcMain.handle('open-create-item-window', async (event, listName) => {
     createChildWindowForRoute(`/create/${encodeURIComponent(listName)}`, {
         width: 420,
         height: 320,
@@ -167,10 +214,9 @@ ipcMain.handle('open-create-window', async (event, listName) => {
     return { ok: true };
 });
 
-
 ipcMain.handle('open-list-window', async (event, listName) => {
     const encoded = encodeURIComponent(listName);
-    createChildWindowForRoute(`/list/${encoded}`, { width: 800, height: 600, parent: mainWindow });
+    createChildWindowForRoute(`/list/${encoded}`, { width: 600, height: 500, parent: mainWindow, frame: false });
     return { ok: true };
 });
 
@@ -180,7 +226,8 @@ ipcMain.handle('open-item-detail-window', async (event, listName, itemId) => {
     createChildWindowForRoute(`/item/${encodedListName}/${encodedItemId}`, {
         width: 600,
         height: 500,
-        parent: mainWindow
+        parent: mainWindow,
+        frame: false
     });
     return { ok: true };
 });
