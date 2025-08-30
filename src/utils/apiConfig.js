@@ -9,18 +9,26 @@ export const AVAILABLE_APIS = {
       'anime': 'ANIME',
       'manga': 'MANGA'
     }
+  },
+  TMDB: {
+    id: 'tmdb',
+    name: 'The Movie DB',
+    types: ['movie', 'tv'],
+    enabled: true,
+    typeMapping: {
+      'movie': 'movie',
+      'tv': 'tv'
+    }
+  },
+  RAWG: {
+    id: 'rawg',
+    name: 'RAWG',
+    types: ['game'],
+    enabled: true,
+    typeMapping: {
+      'game': 'game'
+    }
   }
-  // Exemplo de como adicionar outra API:
-  // TMDB: {
-  //   id: 'tmdb',
-  //   name: 'The Movie DB',
-  //   types: ['movie', 'tv'],
-  //   enabled: false,
-  //   typeMapping: {
-  //     'movie': 'movie',
-  //     'tv': 'tv'
-  //   }
-  // }
 };
 
 export const ALL_TYPES = Object.values(AVAILABLE_APIS)

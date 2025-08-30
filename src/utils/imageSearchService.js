@@ -1,21 +1,29 @@
 // imageSearchService.js
-import { searchAniList } from './anilistApi';
-// Futuramente adicionar outras APIs como TMDB
+import { searchAniListMultiple } from './anilistApi';
+import { searchTMDbMultiple } from './tmdbApi';
+import { searchRAWGMultiple } from './rawgApi';
 
 export async function searchImages(query, mediaType, apiType) {
   try {
     switch (apiType) {
       case 'anilist':
-        const results = await searchAniList(query, mediaType);
-        return results.slice(0, 5).map(item => ({
+        const anilistResults = await searchAniListMultiple(query, mediaType);
+        return anilistResults.slice(0, 5).map(item => ({
           url: item.coverImage?.large || item.coverImage?.medium,
           title: item.title.romaji
         }));
-      
-      // Adicione outros casos para diferentes APIs aqui
-      // case 'tmdb':
-      //   return searchTMDBImages(query, mediaType);
-      
+      case 'tmdb':
+        const tmdbResults = await searchTMDbMultiple(query, mediaType);
+        return tmdbResults.slice(0, 5).map(item => ({
+          url: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+          title: item.title || item.name
+        })).filter(item => item.url); // Filtrar itens sem imagem
+      case 'rawg':
+        const rawgResults = await searchRAWGMultiple(query);
+        return rawgResults.slice(0, 5).map(item => ({
+          url: item.background_image,
+          title: item.name
+        })).filter(item => item.url); // Filtrar itens sem imagem
       default:
         return [];
     }

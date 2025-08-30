@@ -373,25 +373,38 @@ ipcMain.handle('edit-item', async (event, listName, itemId, updatedItem) => {
         return { ok: false, reason: error.message };
     }
 });
-// main.js - Substitua o handler search-images por este:
+// No handler search-images, adicione:
 ipcMain.handle('search-images', async (event, query, mediaType, apiType) => {
-    try {
-        // Implementar a lógica de busca baseada na API
-        if (apiType === 'anime' || apiType === 'manga') {
-            // Buscar múltiplos resultados na AniList
-            const results = await searchAniListMultiple(query, mediaType.toUpperCase());
-            return results.map(item => ({
-                url: item.coverImage?.large || item.coverImage?.medium,
-                title: item.title.romaji || item.title.english || query
-            }));
-        }
-        // Adicione outros casos para outras APIs aqui
-
-        return [];
-    } catch (error) {
-        console.error('Erro na busca de imagens:', error);
-        return [];
+  try {
+    // Implementar a lógica de busca baseada na API
+    if (apiType === 'anime' || apiType === 'manga') {
+      // Buscar múltiplos resultados na AniList
+      const results = await searchAniListMultiple(query, mediaType.toUpperCase());
+      return results.map(item => ({
+        url: item.coverImage?.large || item.coverImage?.medium,
+        title: item.title.romaji || item.title.english || query
+      }));
+    } else if (apiType === 'movie' || apiType === 'tv') {
+      // Buscar no TMDB
+      const results = await searchTMDbMultiple(query, mediaType);
+      return results.map(item => ({
+        url: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
+        title: item.title || item.name || query
+      })).filter(item => item.url); // Filtrar itens sem imagem
+    } else if (apiType === 'game') {
+      // Buscar no RAWG
+      const results = await searchRAWGMultiple(query);
+      return results.map(item => ({
+        url: item.background_image,
+        title: item.name || query
+      })).filter(item => item.url); // Filtrar itens sem imagem
     }
+
+    return [];
+  } catch (error) {
+    console.error('Erro na busca de imagens:', error);
+    return [];
+  }
 });
 // Handler delete-item corrigido
 ipcMain.handle('delete-item', async (event, listName, itemId) => {
