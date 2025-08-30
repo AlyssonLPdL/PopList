@@ -1,81 +1,53 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { autoSearchItem } from "../utils/autoSearch";
 import { ALL_TYPES } from "../utils/apiConfig";
 
-export default function CreateItem() {
-  const { listName } = useParams();
-  const decodedListName = decodeURIComponent(listName || "");
+export default function EditItem() {
+  const { listName: encodedListName, itemId: encodedItemId } = useParams();
+  const listName = decodeURIComponent(encodedListName || "");
+  const itemId = parseInt(decodeURIComponent(encodedItemId || ""));
+  
   const [name, setName] = useState("");
   const [type, setType] = useState("");
   const [episode, setEpisode] = useState(0);
   const [episodeEnabled, setEpisodeEnabled] = useState(true);
   const [rating, setRating] = useState(0);
   const [error, setError] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
-  const [autoFillData, setAutoFillData] = useState(null);
   const [userTags, setUserTags] = useState([]);
   const [listData, setListData] = useState(null);
   const [selectedTags, setSelectedTags] = useState([]);
   const [filterTagText, setFilterTagText] = useState("");
+  const [synonyms, setSynonyms] = useState("");
+  const [synopsis, setSynopsis] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Carrega tipos e tags personalizados da lista
+  // Carrega dados do item e da lista
   useEffect(() => {
-    const loadListData = async () => {
+    const loadData = async () => {
       if (window.api?.getList) {
-        const data = await window.api.getList(decodedListName);
+        const data = await window.api.getList(listName);
         if (data) {
           setListData(data);
-          // Carregar tags personalizadas para o datalist
           setUserTags(Array.isArray(data.customTags) ? data.customTags : []);
 
-          // Definir o tipo inicial baseado nos tipos habilitados
-          const enabledTypes = Array.isArray(data.enabledTypes)
-            ? data.enabledTypes
-            : ALL_TYPES.map((t) => t.value);
-
-          // Se houver tipos habilitados, usar o primeiro como padrão
-          if (enabledTypes.length > 0 && !type) {
-            setType(enabledTypes[0]);
-          }
-        } else {
-          // Se a lista não existe, criar estrutura padrão
-          const defaultData = {
-            name: decodedListName,
-            items: [],
-            enabledTypes: ALL_TYPES.map((t) => t.value),
-            customTags: [],
-          };
-          setListData(defaultData);
-
-          // Definir o primeiro tipo disponível como padrão
-          if (ALL_TYPES.length > 0 && !type) {
-            setType(ALL_TYPES[0].value);
+          // Encontrar o item a ser editado
+          const itemToEdit = data.items.find(item => item.id === itemId);
+          if (itemToEdit) {
+            setName(itemToEdit.name);
+            setType(itemToEdit.type);
+            setEpisode(itemToEdit.episode || 0);
+            setEpisodeEnabled(itemToEdit.episode !== undefined && itemToEdit.episode !== null);
+            setRating(itemToEdit.rating || 0);
+            setSelectedTags(Array.isArray(itemToEdit.tags) ? itemToEdit.tags : []);
+            setSynonyms(Array.isArray(itemToEdit.synonyms) ? itemToEdit.synonyms.join(', ') : "");
+            setSynopsis(itemToEdit.synopsis || "");
           }
         }
+        setIsLoading(false);
       }
     };
-    loadListData();
-  }, [decodedListName]);
-
-  // Busca automática quando o nome ou tipo mudar
-  useEffect(() => {
-    const fetchData = async () => {
-      if (name.length > 3 && type) {
-        // Garantir que type não está vazio
-        setIsSearching(true);
-        const data = await autoSearchItem(name, type);
-        setAutoFillData(data);
-        setIsSearching(false);
-      } else if (autoFillData) {
-        // Se o nome ficou muito curto ou tipo mudou, limpar dados anteriores
-        setAutoFillData(null);
-      }
-    };
-
-    const delayDebounce = setTimeout(fetchData, 1000);
-    return () => clearTimeout(delayDebounce);
-  }, [name, type]);
+    loadData();
+  }, [listName, itemId]);
 
   // Função para adicionar tag
   const addTag = (tag) => {
@@ -89,33 +61,36 @@ export default function CreateItem() {
     setSelectedTags(selectedTags.filter((tag) => tag !== tagToRemove));
   };
 
-  const handleAdd = async () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       setError("Digite um nome para o item");
       return;
     }
 
-    if (window.api?.addItem) {
+    if (window.api?.editItem) {
       const item = {
+        id: itemId,
         name,
         type,
         episode: episodeEnabled ? parseInt(episode) || 0 : 0,
         tags: selectedTags,
         rating,
-        synonyms: autoFillData?.synonyms || [],
-        thumb: autoFillData?.thumb || null,
-        synopsis: autoFillData?.synopsis || "",
-        next: null,
-        prev: null,
+        synonyms: synonyms.split(',').map(s => s.trim()).filter(s => s),
+        synopsis,
+        // Mantém a imagem existente
+        thumb: listData.items.find(i => i.id === itemId)?.thumb || null,
+        // Mantém a sequência existente
+        next: listData.items.find(i => i.id === itemId)?.next || null,
+        prev: listData.items.find(i => i.id === itemId)?.prev || null,
       };
 
       try {
-        const result = await window.api.addItem(decodedListName, item);
+        const result = await window.api.editItem(listName, itemId, item);
 
         if (result.ok) {
           window.close();
         } else {
-          setError(result.reason || "Erro ao adicionar item");
+          setError(result.reason || "Erro ao editar item");
         }
       } catch (err) {
         setError("Falha na comunicação com o sistema");
@@ -143,12 +118,16 @@ export default function CreateItem() {
     ));
   };
 
+  if (isLoading) {
+    return <div style={styles.loading}>Carregando...</div>;
+  }
+
   return (
     <div style={styles.container}>
       <div style={styles.window}>
         <div style={styles.titleBar}>
           <div style={styles.titleBarText}>
-            Adicionar Item - {decodedListName}
+            Editar Item - {listName}
           </div>
           <div style={styles.windowControls}>
             <button style={styles.controlButton} onClick={() => window.close()}>
@@ -158,30 +137,9 @@ export default function CreateItem() {
         </div>
 
         <div style={styles.content}>
-          <h2 style={styles.title}>Novo Item</h2>
+          <h2 style={styles.title}>Editar Item</h2>
 
           {error && <div style={styles.error}>{error}</div>}
-
-          {isSearching && (
-            <div style={styles.searching}>
-              Buscando informações na AniList...
-            </div>
-          )}
-
-          {autoFillData && !isSearching && (
-            <div style={styles.autoFillInfo}>
-              <div style={styles.thumbPreview}>
-                {autoFillData.thumb && (
-                  <img
-                    src={autoFillData.thumb}
-                    alt={autoFillData.name}
-                    style={styles.thumbImage}
-                  />
-                )}
-              </div>
-              <p>(Alteravel) Informações encontradas: {autoFillData.name}</p>
-            </div>
-          )}
 
           <div style={styles.columnsContainer}>
             {/* Coluna do formulário */}
@@ -242,6 +200,28 @@ export default function CreateItem() {
                   <div style={styles.starsContainer}>{renderStars()}</div>
                 </div>
 
+                <div style={styles.synonymsContainer}>
+                  <label style={styles.label}>Sinônimos (separados por vírgula):</label>
+                  <input
+                    type="text"
+                    placeholder="Sinônimos"
+                    value={synonyms}
+                    onChange={(e) => setSynonyms(e.target.value)}
+                    style={styles.input}
+                  />
+                </div>
+
+                <div style={styles.synopsisContainer}>
+                  <label style={styles.label}>Sinopse:</label>
+                  <textarea
+                    placeholder="Sinopse"
+                    value={synopsis}
+                    onChange={(e) => setSynopsis(e.target.value)}
+                    style={styles.textarea}
+                    rows="5"
+                  />
+                </div>
+
                 {/* Tags selecionadas */}
                 <div style={styles.selectedTagsContainer}>
                   <label style={styles.tagsLabel}>Tags selecionadas:</label>
@@ -264,8 +244,8 @@ export default function CreateItem() {
                 </div>
 
                 <div style={styles.buttonContainer}>
-                  <button onClick={handleAdd} style={styles.addButton}>
-                    Adicionar Item
+                  <button onClick={handleSave} style={styles.saveButton}>
+                    Salvar Alterações
                   </button>
                   <button
                     onClick={() => window.close()}
@@ -316,18 +296,18 @@ export default function CreateItem() {
 }
 
 const styles = {
+  // ... (usar os mesmos estilos do CreateItem.jsx, com pequenas adaptações)
   container: {
     height: "100vh",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     margin: 0,
-    fontFamily:
-      '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
   window: {
-    width: "650px",
-    height: "600px",
+    width: "700px",
+    height: "700px",
     backgroundColor: "white",
     display: "flex",
     flexDirection: "column",
@@ -386,37 +366,10 @@ const styles = {
     borderRadius: "6px",
     marginBottom: "15px",
   },
-  searching: {
-    color: "#3498db",
-    padding: "10px",
-    backgroundColor: "#e1f0fa",
-    borderRadius: "6px",
-    marginBottom: "15px",
-  },
-  autoFillInfo: {
-    padding: "10px",
-    backgroundColor: "#e8f5e9",
-    borderRadius: "6px",
-    marginBottom: "15px",
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  },
-  thumbPreview: {
-    width: "60px",
-    height: "80px",
-    overflow: "hidden",
-    borderRadius: "4px",
-  },
-  thumbImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "cover",
-  },
   columnsContainer: {
     display: "flex",
     gap: "20px",
-    height: "70%",
+    height: "85%",
   },
   formColumn: {
     flex: 1,
@@ -436,6 +389,14 @@ const styles = {
     border: "1px solid #ddd",
     borderRadius: "6px",
     fontSize: "14px",
+  },
+  textarea: {
+    padding: "10px",
+    border: "1px solid #ddd",
+    borderRadius: "6px",
+    fontSize: "14px",
+    resize: "vertical",
+    minHeight: "100px",
   },
   select: {
     padding: "10px",
@@ -477,6 +438,12 @@ const styles = {
     fontSize: "14px",
     fontWeight: "500",
   },
+  label: {
+    fontSize: "14px",
+    fontWeight: "500",
+    marginBottom: "5px",
+    display: "block",
+  },
   starsContainer: {
     display: "flex",
     gap: "5px",
@@ -490,6 +457,12 @@ const styles = {
   starIcon: {
     fontSize: "24px",
     color: "#f39c12",
+  },
+  synonymsContainer: {
+    marginTop: "10px",
+  },
+  synopsisContainer: {
+    marginTop: "10px",
   },
   selectedTagsContainer: {
     marginTop: "10px",
@@ -528,10 +501,10 @@ const styles = {
     gap: "10px",
     marginTop: "10px",
   },
-  addButton: {
+  saveButton: {
     flex: 1,
     padding: "12px",
-    backgroundColor: "#3498db",
+    backgroundColor: "#4caf50",
     color: "white",
     border: "none",
     borderRadius: "6px",
@@ -581,14 +554,19 @@ const styles = {
     borderRadius: "6px",
     cursor: "pointer",
     transition: "all 0.2s ease",
-    ":hover": {
-      backgroundColor: "#e0e0e0",
-    },
   },
   noTags: {
     color: "#95a5a6",
     fontStyle: "italic",
     textAlign: "center",
     padding: "20px",
+  },
+  loading: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    height: "100vh",
+    fontSize: "16px",
+    color: "#666",
   },
 };

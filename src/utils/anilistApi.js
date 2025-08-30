@@ -1,5 +1,5 @@
 // anilistApi.js
-import { translateText, isTranslationEnabled, getTargetLanguage } from './translationService';
+import { translateText, isTranslationEnabled, getTargetLanguage } from './translationService.js';
 
 const ANILIST_API_URL = 'https://graphql.anilist.co';
 
@@ -123,4 +123,54 @@ export async function processAniListData(mediaData) {
     synopsis: translatedSynopsis,
     synonyms: synonyms
   };
+}
+
+export async function searchAniListMultiple(searchQuery, type = 'ANIME') {
+  const query = `
+    query ($search: String, $type: MediaType) {
+      Page(page: 1, perPage: 5) {
+        media(search: $search, type: $type) {
+          id
+          title {
+            romaji
+            english
+            native
+          }
+          coverImage {
+            large
+            medium
+          }
+        }
+      }
+    }
+  `;
+
+  const variables = {
+    search: searchQuery,
+    type: type
+  };
+
+  try {
+    const response = await fetch(ANILIST_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        variables
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erro HTTP: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.data.Page.media || [];
+  } catch (error) {
+    console.error('Erro na busca múltipla do AniList:', error);
+    return [];
+  }
 }

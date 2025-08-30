@@ -1,10 +1,18 @@
 // main.js
-const { app, BrowserWindow, ipcMain } = require('electron');
-const path = require('path');
-const fs = require('fs');
-const os = require('os');
+import { searchAniListMultiple } from './src/utils/anilistApi.js';
+import { app, BrowserWindow, ipcMain } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
+import { fileURLToPath } from 'url';
 
-const isDev = require('electron-is-dev');
+// Para obter o equivalente ao __dirname em ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Importar isDev como padrão
+import isDev from 'electron-is-dev';
+
 const devUrl = 'http://localhost:3000';
 const buildIndex = path.join(__dirname, 'build', 'index.html');
 
@@ -17,6 +25,38 @@ const ALL_TYPES = [
     { value: 'anime', api: 'anilist', label: 'Anime' },
     { value: 'manga', api: 'anilist', label: 'Manga' }
 ].map(t => t.value);
+
+async function initializeItemCounter() {
+    try {
+        ensureDirs();
+        const files = fs.readdirSync(listsDir).filter(f => f.endsWith('.json'));
+        let maxId = 0;
+
+        for (const file of files) {
+            try {
+                const safeName = file.replace(/\.json$/, '');
+                const p = path.join(listsDir, file);
+                const rawData = JSON.parse(fs.readFileSync(p, 'utf8'));
+
+                if (rawData.items && Array.isArray(rawData.items)) {
+                    for (const item of rawData.items) {
+                        if (item.id && item.id > maxId) {
+                            maxId = item.id;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error(`Erro ao processar arquivo ${file}:`, err);
+            }
+        }
+
+        itemCounter = maxId;
+        console.log(`Item counter inicializado com: ${itemCounter}`);
+    } catch (err) {
+        console.error('Erro ao inicializar itemCounter:', err);
+        itemCounter = 0;
+    }
+}
 
 function sanitizeFileName(name) {
     return name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
@@ -123,9 +163,38 @@ function normalizeListStructure(listData, listName) {
     };
 }
 
+// Função auxiliar para ler uma lista
+async function readList(listName) {
+    try {
+        const safe = sanitizeFileName(listName);
+        const p = path.join(listsDir, `${safe}.json`);
+        if (!fs.existsSync(p)) return null;
+
+        const rawData = JSON.parse(fs.readFileSync(p, 'utf8'));
+        return normalizeListStructure(rawData, listName);
+    } catch (err) {
+        console.error('Erro ao ler lista:', err);
+        return null;
+    }
+}
+
+// Função auxiliar para salvar uma lista
+async function saveList(listName, listData) {
+    try {
+        const safe = sanitizeFileName(listName);
+        const p = path.join(listsDir, `${safe}.json`);
+        fs.writeFileSync(p, JSON.stringify(listData, null, 2), 'utf8');
+        return true;
+    } catch (err) {
+        console.error('Erro ao salvar lista:', err);
+        return false;
+    }
+}
+
 /* App lifecycle */
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
     ensureDirs();
+    await initializeItemCounter(); // Inicializa o contador com base nos itens existentes
     createMainWindow();
 });
 
@@ -268,6 +337,256 @@ ipcMain.handle('add-item', async (event, listName, item) => {
         return { ok: false, reason: String(err) };
     }
 });
+
+// Handler edit-item corrigido
+ipcMain.handle('edit-item', async (event, listName, itemId, updatedItem) => {
+    try {
+        const list = await readList(listName);
+        if (!list) return { ok: false, reason: 'Lista não encontrada' };
+
+        const itemIndex = list.items.findIndex(item => item.id === itemId);
+        if (itemIndex === -1) return { ok: false, reason: 'Item não encontrado' };
+
+        // Preserva a imagem e sequência se não foram fornecidas
+        if (!updatedItem.thumb) {
+            updatedItem.thumb = list.items[itemIndex].thumb;
+        }
+
+        // Preserva a sequência se não foi fornecida
+        if (!updatedItem.next) {
+            updatedItem.next = list.items[itemIndex].next;
+        }
+
+        if (!updatedItem.prev) {
+            updatedItem.prev = list.items[itemIndex].prev;
+        }
+
+        list.items[itemIndex] = updatedItem;
+        await saveList(listName, list);
+
+        // Notificar todas as janelas sobre a atualização
+        BrowserWindow.getAllWindows().forEach(w => w.webContents.send('lists-updated'));
+
+        return { ok: true };
+    } catch (error) {
+        console.error('Erro ao editar item:', error);
+        return { ok: false, reason: error.message };
+    }
+});
+// main.js - Substitua o handler search-images por este:
+ipcMain.handle('search-images', async (event, query, mediaType, apiType) => {
+    try {
+        // Implementar a lógica de busca baseada na API
+        if (apiType === 'anime' || apiType === 'manga') {
+            // Buscar múltiplos resultados na AniList
+            const results = await searchAniListMultiple(query, mediaType.toUpperCase());
+            return results.map(item => ({
+                url: item.coverImage?.large || item.coverImage?.medium,
+                title: item.title.romaji || item.title.english || query
+            }));
+        }
+        // Adicione outros casos para outras APIs aqui
+
+        return [];
+    } catch (error) {
+        console.error('Erro na busca de imagens:', error);
+        return [];
+    }
+});
+// Handler delete-item corrigido
+ipcMain.handle('delete-item', async (event, listName, itemId) => {
+    try {
+        const list = await readList(listName);
+        if (!list) return { ok: false, reason: 'Lista não encontrada' };
+
+        // Encontrar o item para remover referências de sequência
+        const itemToDelete = list.items.find(item => item.id === itemId);
+        if (!itemToDelete) return { ok: false, reason: 'Item não encontrado' };
+
+        // Remover referências de sequência de outros itens
+        if (itemToDelete.next) {
+            const nextItemIndex = list.items.findIndex(item => item.id === itemToDelete.next.id);
+            if (nextItemIndex !== -1) {
+                list.items[nextItemIndex].prev = null;
+            }
+        }
+
+        if (itemToDelete.prev) {
+            const prevItemIndex = list.items.findIndex(item => item.id === itemToDelete.prev.id);
+            if (prevItemIndex !== -1) {
+                list.items[prevItemIndex].next = null;
+            }
+        }
+
+        // Remover o item
+        list.items = list.items.filter(item => item.id !== itemId);
+        await saveList(listName, list);
+
+        // Notificar todas as janelas sobre a atualização
+        BrowserWindow.getAllWindows().forEach(w => w.webContents.send('lists-updated'));
+
+        return { ok: true };
+    } catch (error) {
+        console.error('Erro ao excluir item:', error);
+        return { ok: false, reason: error.message };
+    }
+});
+
+// Handler update-item-sequence corrigido
+ipcMain.handle('update-item-sequence', async (event, listName, itemId, targetItemId, position) => {
+    try {
+        const list = await readList(listName);
+        if (!list) {
+            console.log('Lista não encontrada');
+            return { ok: false, reason: 'Lista não encontrada' };
+        }
+        const itemIndex = list.items.findIndex(item => item.id === itemId);
+        const targetItemIndex = list.items.findIndex(item => item.id === targetItemId);
+
+        if (itemIndex === -1 || targetItemIndex === -1) {
+            console.log('Item não encontrado');
+            return { ok: false, reason: 'Item não encontrado' };
+        }
+
+        const item = list.items[itemIndex];
+        const targetItem = list.items[targetItemIndex];
+
+        if (position === 'before') {
+            // Definir targetItem como anterior do item atual
+            item.prev = { id: targetItem.id, name: targetItem.name, thumb: targetItem.thumb };
+
+            // Se targetItem tinha um próximo, atualizar a referência
+            if (targetItem.next) {
+                const nextItemIndex = list.items.findIndex(i => i.id === targetItem.next.id);
+                if (nextItemIndex !== -1) {
+                    list.items[nextItemIndex].prev = { id: item.id, name: item.name, thumb: item.thumb };
+                }
+            }
+
+            // Atualizar o próximo do targetItem para apontar para o item atual
+            targetItem.next = { id: item.id, name: item.name, thumb: item.thumb };
+        } else if (position === 'after') {
+            // Definir targetItem como próximo do item atual
+            item.next = { id: targetItem.id, name: targetItem.name, thumb: targetItem.thumb };
+
+            // Se targetItem tinha um anterior, atualizar a referência
+            if (targetItem.prev) {
+                const prevItemIndex = list.items.findIndex(i => i.id === targetItem.prev.id);
+                if (prevItemIndex !== -1) {
+                    list.items[prevItemIndex].next = { id: item.id, name: item.name, thumb: item.thumb };
+                }
+            }
+
+            // Atualizar o anterior do targetItem para apontar para o item atual
+            targetItem.prev = { id: item.id, name: item.name, thumb: item.thumb };
+        }
+
+        await saveList(listName, list);
+        console.log('Sequência atualizada com sucesso');
+
+        // Notificar todas as janelas sobre a atualização
+        BrowserWindow.getAllWindows().forEach(w => w.webContents.send('lists-updated'));
+
+        return { ok: true };
+    } catch (error) {
+        console.error('Erro ao atualizar sequência:', error);
+        return { ok: false, reason: error.message };
+    }
+});
+
+// Handler remove-item-sequence corrigido
+ipcMain.handle('remove-item-sequence', async (event, listName, itemId, sequenceType) => {
+    try {
+        const list = await readList(listName);
+        if (!list) return { ok: false, reason: 'Lista não encontrada' };
+
+        const itemIndex = list.items.findIndex(item => item.id === itemId);
+        if (itemIndex === -1) return { ok: false, reason: 'Item não encontrado' };
+
+        const item = list.items[itemIndex];
+
+        if (sequenceType === 'prev' && item.prev) {
+            // Encontrar o item anterior e remover a referência
+            const prevItemIndex = list.items.findIndex(i => i.id === item.prev.id);
+            if (prevItemIndex !== -1) {
+                list.items[prevItemIndex].next = null;
+            }
+            item.prev = null;
+        } else if (sequenceType === 'next' && item.next) {
+            // Encontrar o próximo item e remover a referência
+            const nextItemIndex = list.items.findIndex(i => i.id === item.next.id);
+            if (nextItemIndex !== -1) {
+                list.items[nextItemIndex].prev = null;
+            }
+            item.next = null;
+        }
+
+        await saveList(listName, list);
+
+        // Notificar todas as janelas sobre a atualização
+        BrowserWindow.getAllWindows().forEach(w => w.webContents.send('lists-updated'));
+
+        return { ok: true };
+    } catch (error) {
+        console.error('Erro ao remover sequência:', error);
+        return { ok: false, reason: error.message };
+    }
+});
+
+// Abrir janela de edição de item
+ipcMain.handle('open-edit-item-window', async (event, listName, itemId) => {
+    const encodedListName = encodeURIComponent(listName);
+    const encodedItemId = encodeURIComponent(itemId);
+
+    createChildWindowForRoute(`/edit/${encodedListName}/${encodedItemId}`, {
+        width: 700,
+        height: 700,
+        parent: BrowserWindow.getFocusedWindow(),
+        modal: true,
+        resizable: false,
+        frame: false
+    });
+
+    return { ok: true };
+});
+
+// Handler para navegar entre itens (fechar atual e abrir novo)
+ipcMain.handle('open-item-detail-window-and-close-current', async (event, listName, itemId) => {
+    try {
+        // Obter a janela atual
+        const currentWindow = BrowserWindow.fromWebContents(event.sender);
+
+        // Criar a nova janela de detalhes do item
+        const detailWindow = new BrowserWindow({
+            width: 600,
+            height: 500,
+            parent: mainWindow,
+            modal: false,
+            frame: false,
+            show: false, // Inicialmente oculta
+            alwaysOnTop: true,
+            webPreferences: {
+                preload: path.join(__dirname, 'preload.js'),
+                contextIsolation: true,
+                nodeIntegration: false,
+            },
+        });
+
+        // Carregar a URL do detalhe do item
+        await detailWindow.loadURL(getBaseUrlForRoute(`/item/${encodeURIComponent(listName)}/${encodeURIComponent(itemId)}`));
+
+        // Quando a nova janela estiver pronta para ser mostrada, fechar a janela atual
+        detailWindow.once('ready-to-show', () => {
+            detailWindow.show();
+            if (currentWindow) {
+                currentWindow.close();
+            }
+        });
+    } catch (error) {
+        console.error('Erro ao navegar para o item:', error);
+    }
+});
+
 ipcMain.handle('update-list', async (event, listName, updatedData) => {
     try {
         const safe = sanitizeFileName(listName);
@@ -296,6 +615,7 @@ ipcMain.handle('update-list', async (event, listName, updatedData) => {
         return { ok: false, reason: String(err) };
     }
 });
+
 ipcMain.handle('get-all-lists-data', async () => {
     try {
         ensureDirs();
@@ -377,6 +697,7 @@ ipcMain.handle('delete-list', async (event, listName) => {
         return { ok: false, reason: String(err) };
     }
 });
+
 /* IPC to open windows from renderer */
 ipcMain.handle('open-list-window', async (event, listName) => {
     const encoded = encodeURIComponent(listName);
